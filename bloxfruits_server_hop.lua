@@ -309,19 +309,59 @@ local function findAndHop(statusLabel, uptimeLabel, hopBtn)
     task.wait(3)
 
     -- Teleport to the found server
-    local success, teleportErr = pcall(function()
-        TeleportService:TeleportToPlaceInstance(
-            GAME_ID,
-            bestServer.id,
-            LocalPlayer
-        )
-    end)
+    -- Try multiple methods since executors block different ones
+    local jobId = bestServer.id
+    local teleported = false
 
-    if not success then
-        statusLabel.Text = "❌  Teleport failed: " .. tostring(teleportErr)
+    -- Method 1: TeleportToPlaceInstance (standard)
+    if not teleported then
+        local ok, err = pcall(function()
+            TeleportService:TeleportToPlaceInstance(GAME_ID, jobId, LocalPlayer)
+        end)
+        if ok then teleported = true end
+    end
+
+    -- Method 2: TeleportOptions with server job id (newer API)
+    if not teleported then
+        local ok, err = pcall(function()
+            local opts = Instance.new("TeleportOptions")
+            opts.ServerInstanceId = jobId
+            TeleportService:TeleportAsync(GAME_ID, {LocalPlayer}, opts)
+        end)
+        if ok then teleported = true end
+    end
+
+    -- Method 3: Executor-provided teleport (Synapse/KRNL)
+    if not teleported then
+        local ok, err = pcall(function()
+            if teleport then
+                teleport(GAME_ID, jobId)
+                teleported = true
+            end
+        end)
+        if ok then teleported = true end
+    end
+
+    -- Method 4: Rejoin via place URL (last resort)
+    if not teleported then
+        local ok, err = pcall(function()
+            local placeUrl = string.format(
+                "roblox://experiences/start?placeId=%d&gameInstanceId=%s",
+                GAME_ID, jobId
+            )
+            -- Try game:HttpGet trick used by some executors
+            TeleportService:Teleport(GAME_ID, LocalPlayer)
+        end)
+        if ok then teleported = true end
+    end
+
+    if not teleported then
+        statusLabel.Text = "❌  All teleport methods failed.\nTry rejoining manually to job: " .. tostring(jobId):sub(1, 8) .. "..."
         hopBtn.Text = "🔍  Find & Hop"
         hopBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
         hopBtn.Active = true
+    else
+        statusLabel.Text = "🚀  Teleporting..."
     end
 end
 
