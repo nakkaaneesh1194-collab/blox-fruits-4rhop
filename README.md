@@ -171,3 +171,28 @@ checkService(game:GetService("ReplicatedStorage"))
 checkService(game:GetService("ReplicatedFirst"))
 checkService(workspace)
 ```
+```lua
+local HttpService = game:GetService("HttpService")
+local log = {}
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "InvokeServer" and self.ClassName == "RemoteFunction" then
+        local result = {oldNamecall(self, ...)}
+        -- Log it
+        table.insert(log, {
+            name = self:GetFullName(),
+            result = tostring(result[1]):sub(1, 100)
+        })
+        return table.unpack(result)
+    end
+    return oldNamecall(self, ...)
+end))
+
+-- Wait a few seconds for QO to call its remotes, then print log
+task.wait(5)
+for _, entry in ipairs(log) do
+    print("RF:", entry.name, "->", entry.result)
+end
+```
