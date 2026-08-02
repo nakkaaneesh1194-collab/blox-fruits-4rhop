@@ -227,3 +227,21 @@ if clockValue then
     print("Uptime:", math.floor(clockValue/3600), "h", math.floor((clockValue%3600)/60), "m")
 end
 ```
+```lua
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local result = {oldNamecall(self, ...)}
+    if method == "InvokeServer" and self.ClassName == "RemoteFunction" then
+        local r = result[1]
+        -- Only print if result looks like a small number (could be uptime seconds)
+        if type(r) == "number" and r < 100000 and r > 0 then
+            print("RF:", self:GetFullName(), "->", r, "| as mins:", math.floor(r/60))
+        end
+    end
+    return table.unpack(result)
+end))
+
+task.wait(10)
+print("done")
+```
