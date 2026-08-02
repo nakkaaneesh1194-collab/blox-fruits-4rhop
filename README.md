@@ -279,3 +279,18 @@ oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
     return table.unpack(result)
 end))
 ```
+```lua
+local rs = game:GetService("ReplicatedStorage")
+for _, v in pairs(rs:GetDescendants()) do
+    if v.ClassName == "ModuleScript" then
+        local ok, result = pcall(require, v)
+        if ok and type(result) == "table" then
+            for k, val in pairs(result) do
+                if type(val) == "number" and val > 1700000000 and val < os.time() then
+                    print(v:GetFullName(), k, val, "uptime:", math.floor((os.time()-val)/3600).."h", math.floor(((os.time()-val)%3600)/60).."m")
+                end
+            end
+        end
+    end
+end
+```
