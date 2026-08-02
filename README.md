@@ -379,4 +379,19 @@ else
     print("no http spy available")
 end
 ```
+```lua
+local now = os.time()
+for _, v in pairs(getgc()) do
+    if type(v) == "number" and v > 1700000000 and v < now then
+        print("GC number:", v, "uptime:", math.floor((now-v)/3600).."h", math.floor(((now-v)%3600)/60).."m")
+    end
+end
+```
+```lua
+for _, v in pairs(getgc()) do
+    if type(v) == "string" and v:find("uptime") then
+        print("GC string:", v:sub(1,100))
+    end
+end
+```
 
