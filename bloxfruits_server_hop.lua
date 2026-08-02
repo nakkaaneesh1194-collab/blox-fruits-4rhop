@@ -184,9 +184,14 @@ end
 
 -- ─── Uptime Tracker ─────────────────────────────────────────────────────────
 
--- workspace.DistributedGameTime is the real server age in seconds since server start
+-- Gets true server uptime in seconds.
+-- workspace.DistributedGameTime counts from server start and is readable client-side.
+-- On Delta executor this is the correct value.
 local function getServerUptime()
-    return workspace.DistributedGameTime
+    -- DistributedGameTime is server clock elapsed since server started (not player join time)
+    local t = workspace.DistributedGameTime
+    -- Sanity check: if it looks like session time (very low), it's correct — server is new
+    return t
 end
 
 local function formatTime(seconds)
@@ -308,61 +313,37 @@ local function findAndHop(statusLabel, uptimeLabel, hopBtn)
 
     task.wait(3)
 
-    -- Teleport to the found server
-    -- Try multiple methods since executors block different ones
     local jobId = bestServer.id
-    local teleported = false
+    statusLabel.Text = "🚀  Teleporting..."
 
-    -- Method 1: TeleportToPlaceInstance (standard)
-    if not teleported then
+    -- Delta executor compatible teleport
+    -- TeleportToPlaceInstance must be called in a new thread on Delta
+    task.spawn(function()
         local ok, err = pcall(function()
             TeleportService:TeleportToPlaceInstance(GAME_ID, jobId, LocalPlayer)
         end)
-        if ok then teleported = true end
-    end
+        if ok then return end
 
-    -- Method 2: TeleportOptions with server job id (newer API)
-    if not teleported then
-        local ok, err = pcall(function()
+        -- Fallback: TeleportAsync with TeleportOptions
+        local ok2, err2 = pcall(function()
             local opts = Instance.new("TeleportOptions")
             opts.ServerInstanceId = jobId
             TeleportService:TeleportAsync(GAME_ID, {LocalPlayer}, opts)
         end)
-        if ok then teleported = true end
-    end
+        if ok2 then return end
 
-    -- Method 3: Executor-provided teleport (Synapse/KRNL)
-    if not teleported then
-        local ok, err = pcall(function()
-            if teleport then
-                teleport(GAME_ID, jobId)
-                teleported = true
-            end
+        -- Fallback: Delta sometimes exposes global teleport()
+        local ok3 = pcall(function()
+            if teleport then teleport(GAME_ID, jobId) end
         end)
-        if ok then teleported = true end
-    end
+        if ok3 then return end
 
-    -- Method 4: Rejoin via place URL (last resort)
-    if not teleported then
-        local ok, err = pcall(function()
-            local placeUrl = string.format(
-                "roblox://experiences/start?placeId=%d&gameInstanceId=%s",
-                GAME_ID, jobId
-            )
-            -- Try game:HttpGet trick used by some executors
-            TeleportService:Teleport(GAME_ID, LocalPlayer)
-        end)
-        if ok then teleported = true end
-    end
-
-    if not teleported then
-        statusLabel.Text = "❌  All teleport methods failed.\nTry rejoining manually to job: " .. tostring(jobId):sub(1, 8) .. "..."
+        -- All failed — show error
+        statusLabel.Text = "❌  Teleport failed: " .. tostring(err2) .. "\nJob ID: " .. tostring(jobId):sub(1,12)
         hopBtn.Text = "🔍  Find & Hop"
         hopBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
         hopBtn.Active = true
-    else
-        statusLabel.Text = "🚀  Teleporting..."
-    end
+    end)
 end
 
 -- ─── Main ───────────────────────────────────────────────────────────────────
