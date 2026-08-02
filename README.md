@@ -418,4 +418,33 @@ local res = request({
 })
 print(res.Body)
 ```
+```lua
+local HttpService = game:GetService("HttpService")
+
+-- Try different auth formats
+local tests = {
+    {header = "Authorization", value = "lL6AK8hLchDO"},
+    {header = "x-api-key", value = "lL6AK8hLchDO"},
+    {header = "token", value = "lL6AK8hLchDO"},
+    {header = "Authorization", value = "Bearer lL6AK8hLchDO"},
+    {header = "x-ropro-token", value = "lL6AK8hLchDO"},
+}
+
+for _, t in ipairs(tests) do
+    local res = request({
+        Url = "https://api.ropro.io/getServerAge.php?serverId=" .. game.JobId,
+        Method = "GET",
+        Headers = { [t.header] = t.value }
+    })
+    print(t.header .. "=" .. t.value .. " ->", res.Body)
+    task.wait(0.5)
+end
+```
+```lua
+local res = request({
+    Url = "https://api.ropro.io/getServerAge.php?serverId=" .. game.JobId .. "&token=lL6AK8hLchDO",
+    Method = "GET"
+})
+print(res.Body)
+```
 
