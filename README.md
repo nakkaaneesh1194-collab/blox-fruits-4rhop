@@ -205,3 +205,25 @@ print("diff:", os.time() - result)
 print("as hours:", math.floor((os.time() - result) / 3600))
 print("as minutes:", math.floor(((os.time() - result) % 3600) / 60))
 ```
+```lua
+local clockValue = nil
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local result = {oldNamecall(self, ...)}
+    if method == "InvokeServer" 
+        and self:GetFullName() == "ReplicatedStorage.Remotes.Clock.DelayedRequestFunction" 
+        and type(result[1]) == "number" then
+        clockValue = result[1]
+    end
+    return table.unpack(result)
+end))
+
+-- Wait for QO to call it, then check
+task.wait(3)
+print("Clock value captured:", clockValue)
+if clockValue then
+    print("Uptime:", math.floor(clockValue/3600), "h", math.floor((clockValue%3600)/60), "m")
+end
+```
