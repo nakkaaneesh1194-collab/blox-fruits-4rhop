@@ -294,3 +294,31 @@ for _, v in pairs(rs:GetDescendants()) do
     end
 end
 ```
+```lua
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local result = {oldNamecall(self, ...)}
+    if method == "InvokeServer" and self.ClassName == "RemoteFunction" then
+        local r = result[1]
+        if type(r) == "table" then
+            -- Deep search the table for anything that looks like a unix timestamp
+            local function search(t, path)
+                for k, v in pairs(t) do
+                    local fullPath = path .. "." .. tostring(k)
+                    if type(v) == "number" and v > 1700000000 and v < os.time() then
+                        print(self:GetFullName(), fullPath, "=", v, "uptime:", math.floor((os.time()-v)/3600).."h", math.floor(((os.time()-v)%3600)/60).."m")
+                    elseif type(v) == "table" then
+                        search(v, fullPath)
+                    end
+                end
+            end
+            search(r, self.Name)
+        end
+    end
+    return table.unpack(result)
+end))
+
+task.wait(10)
+print("done")
+```
