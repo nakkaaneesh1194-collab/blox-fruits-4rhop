@@ -129,3 +129,29 @@ local jobId = game.JobId
 local res = request({Url = "https://api.ropro.io/getServerAge.php?serverId=" .. jobId, Method = "GET"})
 print(res.Body)
 ```
+```lua
+local rs = game:GetService("ReplicatedStorage")
+local snapshots = {}
+
+-- First snapshot
+for _, v in pairs(rs:GetDescendants()) do
+    if v.ClassName == "NumberValue" or v.ClassName == "IntValue" then
+        snapshots[v:GetFullName()] = v.Value
+    end
+end
+
+task.wait(5)
+
+-- Second snapshot — find anything that ticked up ~5 seconds
+for _, v in pairs(rs:GetDescendants()) do
+    if v.ClassName == "NumberValue" or v.ClassName == "IntValue" then
+        local old = snapshots[v:GetFullName()]
+        if old then
+            local diff = v.Value - old
+            if diff >= 3 and diff <= 7 then
+                print("FOUND:", v:GetFullName(), "| current:", v.Value, "| changed by:", diff)
+            end
+        end
+    end
+end
+```
