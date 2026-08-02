@@ -408,4 +408,14 @@ for _, v in pairs(getgc()) do
     end
 end
 ```
+```lua
+local res = request({
+    Url = "https://api.ropro.io/getServerAge.php?serverId=" .. game.JobId,
+    Method = "GET",
+    Headers = {
+        ["Authorization"] = "lL6AK8hLchDO"
+    }
+})
+print(res.Body)
+```
 
