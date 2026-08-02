@@ -89,3 +89,24 @@ for _, v in pairs(rs:GetDescendants()) do
     end
 end
 ```
+
+```lua
+local now = os.time()
+local services = {
+    game:GetService("ReplicatedStorage"),
+    game:GetService("ReplicatedFirst"),
+    workspace
+}
+for _, svc in pairs(services) do
+    for _, v in pairs(svc:GetDescendants()) do
+        -- Check all value types
+        local ok, val = pcall(function() return v.Value end)
+        if ok and val then
+            local num = tonumber(val)
+            if num and num > (now - 86400) and num < (now - 60) and num > 1700000000 then
+                print(v:GetFullName(), v.ClassName, num, "= uptime:", math.floor((now - num)/3600), "hrs", math.floor(((now-num)%3600)/60), "min")
+            end
+        end
+    end
+end
+```
