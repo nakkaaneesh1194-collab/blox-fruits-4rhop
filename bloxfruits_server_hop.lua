@@ -9,10 +9,31 @@ local TARGET_SEA = 2 -- Second Sea
 
 -- Services
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+
+-- Executor-compatible HTTP function
+-- Supports: request(), syn.request(), http.request(), HttpSpy, fluxus, etc.
+local function httpGet(url)
+    if syn and syn.request then
+        local res = syn.request({ Url = url, Method = "GET" })
+        return res.Body
+    elseif http and http.request then
+        local res = http.request({ Url = url, Method = "GET" })
+        return res.Body
+    elseif request then
+        local res = request({ Url = url, Method = "GET" })
+        return res.Body
+    elseif (fluxus and fluxus.request) then
+        local res = fluxus.request({ Url = url, Method = "GET" })
+        return res.Body
+    else
+        -- Last resort: game's HttpService (works in some exploits)
+        return HttpService:GetAsync(url, true)
+    end
+end
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -163,8 +184,10 @@ end
 
 -- ─── Uptime Tracker ─────────────────────────────────────────────────────────
 
-local joinTime = tick()
-local serverStartOffset = 0  -- set when we know server age (from hop target)
+-- workspace.DistributedGameTime is the real server age in seconds since server start
+local function getServerUptime()
+    return workspace.DistributedGameTime
+end
 
 local function formatTime(seconds)
     local h = math.floor(seconds / 3600)
@@ -190,13 +213,14 @@ local function fetchServers(cursor)
         GAME_ID,
         cursor and ("&cursor=" .. cursor) or ""
     )
-    local ok, result = pcall(function()
-        return HttpService:GetAsync(url, true)
-    end)
+    local ok, result = pcall(httpGet, url)
     if not ok then
         return nil, "HTTP request failed: " .. tostring(result)
     end
-    local data = HttpService:JSONDecode(result)
+    local ok2, data = pcall(HttpService.JSONDecode, HttpService, result)
+    if not ok2 then
+        return nil, "JSON parse failed: " .. tostring(data)
+    end
     return data, nil
 end
 
@@ -305,11 +329,10 @@ end
 
 local ScreenGui, StatusLabel, UptimeLabel, HopButton = buildGui()
 
--- Live uptime ticker (updates every second)
+-- Live uptime ticker — uses workspace.DistributedGameTime for real server age
 local uptimeConnection
 uptimeConnection = RunService.Heartbeat:Connect(function()
-    local elapsed = tick() - joinTime + serverStartOffset
-    UptimeLabel.Text = "Server Uptime\n" .. formatTime(elapsed)
+    UptimeLabel.Text = "Server Uptime\n" .. formatTime(getServerUptime())
 end)
 
 -- Cleanup on GUI removal
