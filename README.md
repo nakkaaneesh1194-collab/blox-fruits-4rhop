@@ -245,3 +245,20 @@ end))
 task.wait(10)
 print("done")
 ```
+```lua
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local result = {oldNamecall(self, ...)}
+    -- Catch ALL remote calls, filter out Clock spam
+    if (method == "InvokeServer" or method == "FireServer") 
+        and self.ClassName == "RemoteFunction" 
+        and not self:GetFullName():find("Clock") then
+        print("RF:", self:GetFullName(), "->", tostring(result[1]):sub(1,80))
+    end
+    return table.unpack(result)
+end))
+
+task.wait(10)
+print("done")
+```
