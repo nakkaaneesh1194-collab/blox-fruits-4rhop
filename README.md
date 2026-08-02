@@ -75,3 +75,17 @@ print("workspace start attr:", workspace:GetAttribute("StartTime"))
 print("os.time:", os.time())
 print("DistributedGameTime:", workspace.DistributedGameTime)
 ```
+```lua
+local rs = game:GetService("ReplicatedStorage")
+local now = os.time()
+for _, v in pairs(rs:GetDescendants()) do
+    if v.ClassName == "NumberValue" or v.ClassName == "IntValue" then
+        local val = v.Value
+        -- Server start time would be an os.time() value from hours ago
+        -- So between (now - 24hrs) and (now - 1min)
+        if val > (now - 86400) and val < (now - 60) and val > 1700000000 then
+            print(v:GetFullName(), val, "uptime:", now - val, "seconds =", math.floor((now-val)/3600), "hrs")
+        end
+    end
+end
+```
