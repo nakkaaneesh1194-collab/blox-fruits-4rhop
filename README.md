@@ -394,4 +394,18 @@ for _, v in pairs(getgc()) do
     end
 end
 ```
+```lua
+local dgt = workspace.DistributedGameTime -- we know this is ~sandboxed but try anyway
+print("DGT:", dgt)
+
+for _, v in pairs(getgc()) do
+    if type(v) == "table" then
+        for k, val in pairs(v) do
+            if type(val) == "number" and val > 1700000000 and val < os.time() then
+                print("table key:", tostring(k), "val:", val, "uptime:", math.floor((os.time()-val)/3600).."h", math.floor(((os.time()-val)%3600)/60).."m")
+            end
+        end
+    end
+end
+```
 
