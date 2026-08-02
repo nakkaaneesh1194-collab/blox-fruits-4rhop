@@ -343,3 +343,23 @@ end
 task.wait(15)
 print("done")
 ```
+```lua
+-- Run this BEFORE QO
+local oldRequest = request
+request = newcclosure(function(opts)
+    print("REQ:", tostring(opts.Url):sub(1, 150))
+    return oldRequest(opts)
+end)
+
+local HttpService = game:GetService("HttpService")
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "GetAsync" or method == "PostAsync" then
+        print("HTTP:", method, tostring(select(1,...)):sub(1,150))
+    end
+    return oldNamecall(self, ...)
+end))
+
+print("Hook active - now execute QO")
+```
