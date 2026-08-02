@@ -118,3 +118,9 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
     Duration = 10
 })
 ```
+
+```lua
+local SettingsService = game:GetService("SettingsService")
+local start = SettingsService:GetServerStart()
+print("Start:", start, "Uptime:", os.time() - start, "=", math.floor((os.time()-start)/3600), "h", math.floor(((os.time()-start)%3600)/60), "m")
+```
