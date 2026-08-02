@@ -110,3 +110,11 @@ for _, svc in pairs(services) do
     end
 end
 ```
+```lua
+local val = workspace.DistributedGameTime
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Server Uptime",
+    Text = "DGT: " .. math.floor(val) .. "s = " .. math.floor(val/3600) .. "h " .. math.floor((val%3600)/60) .. "m",
+    Duration = 10
+})
+```
