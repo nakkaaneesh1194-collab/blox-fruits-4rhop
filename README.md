@@ -42,3 +42,14 @@ This script is for educational purposes only. Using executors violates Roblox's 
 ---
 
 *Made for Blox Fruits on Roblox.*
+
+test ig
+
+```lua
+local rs = game:GetService("ReplicatedStorage")
+for _, v in pairs(rs:GetDescendants()) do
+    if v.Name:lower():find("uptime") or v.Name:lower():find("time") then
+        print(v:GetFullName(), v.ClassName, pcall(function() return v.Value end))
+    end
+end
+```
