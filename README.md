@@ -262,3 +262,20 @@ end))
 task.wait(10)
 print("done")
 ```
+```lua
+local rf = game:GetService("ReplicatedStorage").Remotes.Clock.DelayedRequestFunction
+-- Spy on next QO call
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local result = {oldNamecall(self, ...)}
+    if method == "InvokeServer" and self == rf then
+        local v = result[1]
+        print("raw:", v)
+        print("os.time():", os.time())
+        print("os.time() - v:", os.time() - v)
+        print("v - os.time():", v - os.time())
+    end
+    return table.unpack(result)
+end))
+```
