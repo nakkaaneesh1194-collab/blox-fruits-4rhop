@@ -196,3 +196,12 @@ for _, entry in ipairs(log) do
     print("RF:", entry.name, "->", entry.result)
 end
 ```
+```lua
+local rf = game:GetService("ReplicatedStorage").Remotes.Clock.DelayedRequestFunction
+local ok, result = pcall(function() return rf:InvokeServer() end)
+print("Clock value:", result)
+print("os.time():", os.time())
+print("diff:", os.time() - result)
+print("as hours:", math.floor((os.time() - result) / 3600))
+print("as minutes:", math.floor(((os.time() - result) % 3600) / 60))
+```
