@@ -53,3 +53,25 @@ for _, v in pairs(rs:GetDescendants()) do
     end
 end
 ```
+
+```lua
+local rs = game:GetService("ReplicatedStorage")
+for _, v in pairs(rs:GetDescendants()) do
+    if (v.Name:lower():find("uptime") or v.Name:lower():find("servertime") or v.Name:lower():find("starttime")) then
+        print(v:GetFullName(), v.ClassName, pcall(function() return v.Value end))
+    end
+end
+
+-- Also check workspace
+for _, v in pairs(workspace:GetDescendants()) do
+    if v.Name:lower():find("uptime") or v.Name:lower():find("servertime") then
+        print("workspace:", v:GetFullName(), v.ClassName)
+    end
+end
+
+-- Check if BF exposes it as an attribute
+print("workspace uptime attr:", workspace:GetAttribute("ServerUptime"))
+print("workspace start attr:", workspace:GetAttribute("StartTime"))
+print("os.time:", os.time())
+print("DistributedGameTime:", workspace.DistributedGameTime)
+```
