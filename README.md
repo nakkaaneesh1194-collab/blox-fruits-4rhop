@@ -155,3 +155,19 @@ for _, v in pairs(rs:GetDescendants()) do
     end
 end
 ```
+```lua
+local function checkService(svc)
+    for _, v in pairs(svc:GetDescendants()) do
+        if v.ClassName == "StringValue" then
+            local val = tonumber(v.Value)
+            if val and val > 1700000000 and val < os.time() then
+                print(v:GetFullName(), v.Value, "uptime:", math.floor((os.time()-val)/3600), "h", math.floor(((os.time()-val)%3600)/60), "m")
+            end
+        end
+    end
+end
+
+checkService(game:GetService("ReplicatedStorage"))
+checkService(game:GetService("ReplicatedFirst"))
+checkService(workspace)
+```
