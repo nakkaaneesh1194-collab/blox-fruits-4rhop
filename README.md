@@ -363,3 +363,20 @@ end))
 
 print("Hook active - now execute QO")
 ```
+```lua
+-- Delta has a built-in http logger
+if http_spy then
+    http_spy(function(url, method, body)
+        print("SPY:", method, url:sub(1,150))
+    end)
+    print("http_spy active")
+elseif HttpSpy then
+    HttpSpy(function(url)
+        print("SPY:", url:sub(1,150))
+    end)
+    print("HttpSpy active")
+else
+    print("no http spy available")
+end
+```
+
