@@ -322,3 +322,24 @@ end))
 task.wait(10)
 print("done")
 ```
+```lua
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "GetAsync" or method == "PostAsync" or method == "RequestAsync" then
+        local args = {...}
+        print("HTTP:", method, tostring(args[1]):sub(1, 120))
+    end
+    return oldNamecall(self, ...)
+end))
+
+-- Also hook executor's request function
+local oldRequest = request
+request = function(opts)
+    print("request():", tostring(opts.Url):sub(1, 120))
+    return oldRequest(opts)
+end
+
+task.wait(15)
+print("done")
+```
