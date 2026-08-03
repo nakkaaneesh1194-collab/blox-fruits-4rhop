@@ -2,10 +2,10 @@
 -- Finds a Second Sea server with ~3:57 hours uptime (237 minutes)
 -- Shows a GUI with live server uptime display
 
-local TARGET_UPTIME_MINUTES = 237 -- 3 hours 57 minutes
+local TARGET_UPTIME_MINUTES = 180 -- 3 hours (Fist of Darkness / Chalice spawn)
 local UPTIME_TOLERANCE = 10 -- ±10 minutes tolerance
 local GAME_ID = 2753915549 -- Blox Fruits game ID
-local TARGET_SEA = 2 -- Second Sea
+local TARGET_SEA = 2 -- Second Sea (sea2) or 3 for Third Sea (sea3)
 
 -- Services
 local TeleportService = game:GetService("TeleportService")
@@ -184,15 +184,42 @@ end
 
 -- ─── Uptime Tracker ─────────────────────────────────────────────────────────
 
--- Gets true server uptime in seconds.
--- workspace.DistributedGameTime counts from server start and is readable client-side.
--- On Delta executor this is the correct value.
-local function getServerUptime()
-    -- DistributedGameTime is server clock elapsed since server started (not player join time)
-    local t = workspace.DistributedGameTime
-    -- Sanity check: if it looks like session time (very low), it's correct — server is new
-    return t
+-- Uses RoPro API to get real server age in seconds from the current jobId
+local function fetchServerAge(jobId)
+    local url = "https://api.ropro.io/getServerAge.php?serverId=" .. jobId
+    local ok, result = pcall(httpGet, url)
+    if not ok then return nil end
+    local ok2, data = pcall(HttpService.JSONDecode, HttpService, result)
+    if not ok2 then return nil end
+    -- RoPro returns { age: <seconds> }
+    return data.age or data.Age or nil
 end
+
+local serverAgeSeconds = nil
+
+local function getServerUptime()
+    if serverAgeSeconds then
+        -- serverAgeSeconds was fetched at script load, add elapsed time since then
+        return serverAgeSeconds + (os.time() - scriptLoadTime)
+    end
+    return workspace.DistributedGameTime
+end
+
+local scriptLoadTime = os.time()
+
+-- Fetch current server's age on load
+task.spawn(function()
+    local jobId = game.JobId
+    if jobId and jobId ~= "" then
+        local age = fetchServerAge(jobId)
+        if age then
+            serverAgeSeconds = age
+            print("[BF Server Hop] RoPro server age:", age, "seconds =", math.floor(age/3600), "h", math.floor((age%3600)/60), "m")
+        else
+            print("[BF Server Hop] RoPro age fetch failed, using fallback")
+        end
+    end
+end)
 
 local function formatTime(seconds)
     local h = math.floor(seconds / 3600)
@@ -203,14 +230,29 @@ end
 
 -- ─── Server Fetcher ─────────────────────────────────────────────────────────
 
--- Uses the Roblox Games API to list servers, then picks one whose uptime
--- (estimated from player count churn or creation time if available)
--- is close to the target.
--- NOTE: The public server list endpoint gives us server IDs and player counts
--- but NOT creation time. We use the "playing" field as a heuristic —
--- older servers tend to have more stable player counts.
--- For a precise uptime match we sort by ascending player count
--- (freshly restarted servers typically refill) and pick the closest estimate.
+-- First tries the local Python tracker (http://localhost:8765)
+-- which has accurate server ages from overnight tracking.
+-- Falls back to player count heuristic if tracker isn't running.
+
+local TRACKER_URL = "https://bf-tracker.onrender.com"
+
+local function queryTracker()
+    local seaKey = "sea" .. TARGET_SEA
+    local url = string.format("%s/best?sea=%s&target=%d&tolerance=15", TRACKER_URL, seaKey, TARGET_UPTIME_MINUTES)
+    local ok, result = pcall(httpGet, url)
+    if not ok then return nil end
+    local ok2, data = pcall(HttpService.JSONDecode, HttpService, result)
+    if not ok2 or data.error then return nil end
+    return data -- { serverId, ageMinutes, ageHours, diffMinutes }
+end
+
+local function checkTrackerStatus()
+    local ok, result = pcall(httpGet, TRACKER_URL .. "/status")
+    if not ok then return nil end
+    local ok2, data = pcall(HttpService.JSONDecode, HttpService, result)
+    if not ok2 then return nil end
+    return data
+end
 
 local function fetchServers(cursor)
     local url = string.format(
@@ -229,18 +271,19 @@ local function fetchServers(cursor)
     return data, nil
 end
 
--- Estimate server uptime in minutes from server data.
--- Roblox public API does not expose creation time directly.
--- We use fps and ping as secondary signals; primarily we
--- check all pages for the server with the most players (most stable/oldest)
--- OR expose the field if the executor provides it via a custom endpoint.
-local function estimateUptimeMinutes(server)
-    -- Some executors inject server start time via a hidden field or
-    -- we check if the server was created close to our target window.
-    -- Fallback: treat servers with maxPlayers fill ratio as older.
-    local ratio = (server.playing or 0) / math.max(server.maxPlayers or 1, 1)
-    -- Rough heuristic: 80%+ fill → server has been up a while
-    return ratio * 300  -- scale to ~5 hours max
+-- Get real server age in minutes via RoPro API
+local function getRealUptimeMinutes(jobId)
+    local url = "https://api.ropro.io/getServerAge.php?serverId=" .. tostring(jobId)
+    local ok, result = pcall(httpGet, url)
+    if not ok then return nil end
+    local ok2, data = pcall(HttpService.JSONDecode, HttpService, result)
+    if not ok2 then return nil end
+    -- RoPro returns { "age": <seconds> }
+    local ageSeconds = data.age or data.Age
+    if ageSeconds then
+        return ageSeconds / 60
+    end
+    return nil
 end
 
 -- ─── Server Hop Logic ───────────────────────────────────────────────────────
@@ -250,77 +293,52 @@ local function findAndHop(statusLabel, uptimeLabel, hopBtn)
     hopBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
     hopBtn.Active = false
 
-    statusLabel.Text = "⏳  Fetching server list..."
+    -- Try local tracker first (accurate ages from overnight data)
+    statusLabel.Text = "⏳  Checking local tracker..."
+    local trackerResult = queryTracker()
 
-    local bestServer = nil
-    local bestDiff = math.huge
-    local cursor = nil
-    local pageCount = 0
-    local maxPages = 5
+    local jobId = nil
+    local ageDisplay = ""
 
-    repeat
-        local data, err = fetchServers(cursor)
-        if err or not data then
-            statusLabel.Text = "❌  Error: " .. (err or "no data")
+    if trackerResult and trackerResult.serverId then
+        jobId = trackerResult.serverId
+        ageDisplay = string.format("~%dh %dm (tracker data, diff: %dm)",
+            math.floor(trackerResult.ageMinutes / 60),
+            math.floor(trackerResult.ageMinutes % 60),
+            math.floor(trackerResult.diffMinutes)
+        )
+        statusLabel.Text = "✅  Tracker found a match: " .. ageDisplay .. "\n🚀  Teleporting in 3s..."
+    else
+        -- Tracker not running or no data yet — fall back to random hop
+        statusLabel.Text = "⚠️  Tracker offline. Picking random server...\n(Run bf_tracker.py for accurate results)"
+        task.wait(2)
+
+        local data, err = fetchServers(nil)
+        if err or not data or not data.data or #data.data == 0 then
+            statusLabel.Text = "❌  Error: " .. (err or "no servers found")
             hopBtn.Text = "🔍  Find & Hop"
             hopBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
             hopBtn.Active = true
             return
         end
 
-        local servers = data.data or {}
-        for _, server in ipairs(servers) do
-            -- Skip private servers
-            if server.serverType ~= "Private" and server.id then
-                local estUptime = estimateUptimeMinutes(server)
-                local diff = math.abs(estUptime - TARGET_UPTIME_MINUTES)
-                if diff < bestDiff then
-                    bestDiff = diff
-                    bestServer = server
-                    -- Attach estimated uptime for display
-                    bestServer._estUptime = estUptime
-                end
-            end
-        end
-
-        cursor = data.nextPageCursor
-        pageCount = pageCount + 1
-
-        statusLabel.Text = string.format(
-            "⏳  Scanned %d page(s), best match: ~%dm uptime",
-            pageCount, bestServer and math.floor(bestServer._estUptime or 0) or 0
-        )
-
-        task.wait(0.5)
-    until not cursor or pageCount >= maxPages
-
-    if not bestServer then
-        statusLabel.Text = "❌  No suitable server found. Try again."
-        hopBtn.Text = "🔍  Find & Hop"
-        hopBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
-        hopBtn.Active = true
-        return
+        -- Pick a random server from first page
+        local servers = data.data
+        local pick = servers[math.random(1, #servers)]
+        jobId = pick.id
+        ageDisplay = "unknown (tracker offline)"
+        statusLabel.Text = "🚀  Hopping to random server in 3s...\nStart bf_tracker.py for accurate uptime matching!"
     end
-
-    local estMins = bestServer._estUptime or 0
-    statusLabel.Text = string.format(
-        "✅  Found server! Est. uptime: ~%dh %dm\n🚀  Teleporting in 3s...",
-        math.floor(estMins / 60), math.floor(estMins % 60)
-    )
-
-    -- Set the uptime offset so our live counter shows estimated server age
-    serverStartOffset = estMins * 60
 
     task.wait(3)
 
-    local jobId = bestServer.id
     statusLabel.Text = "🚀  Teleporting..."
 
     -- Delta executor compatible teleport
     -- TeleportToPlaceInstance must be called in a new thread on Delta
     task.spawn(function()
         local ok, err = pcall(function()
-            TeleportService:TeleportToPlaceInstance(GAME_ID, jobId, LocalPlayer)
+            TeleportService:TeleportToPlaceInstance(GAME_ID, jobId)
         end)
         if ok then return end
 
@@ -368,5 +386,12 @@ HopButton.MouseButton1Click:Connect(function()
     task.spawn(findAndHop, StatusLabel, UptimeLabel, HopButton)
 end)
 
-StatusLabel.Text = "✅  Ready! Click 'Find & Hop' to search for\na Second Sea server (~3h 57m uptime)."
+-- Show real uptime immediately on load
+if serverStartTime then
+    local uptime = os.time() - serverStartTime
+    StatusLabel.Text = string.format("✅  Ready! This server has been up for %dh %dm.\nClick 'Find & Hop' to search for ~3h 57m server.",
+        math.floor(uptime/3600), math.floor((uptime%3600)/60))
+else
+    StatusLabel.Text = "✅  Ready! Click 'Find & Hop' to search for\na Second Sea server (~3h 57m uptime)."
+end
 print("[BF Server Hop] Script loaded. GUI visible — click 'Find & Hop' to begin.")
