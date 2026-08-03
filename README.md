@@ -447,4 +447,19 @@ local res = request({
 })
 print(res.Body)
 ```
+```lua
+for _, v in pairs(workspace:GetDescendants()) do
+    if v.Name:lower():find("sword") or v.Name:lower():find("legendary") or v.Name:lower():find("dealer") then
+        print(v:GetFullName(), v.ClassName, pcall(function() return v.Value end))
+    end
+end
+
+-- Also check ReplicatedStorage
+for _, v in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+    if v.Name:lower():find("sword") or v.Name:lower():find("legendary") or v.Name:lower():find("dealer") then
+        print(v:GetFullName(), v.ClassName, pcall(function() return v.Value end))
+    end
+end
+```
+
 
