@@ -480,5 +480,23 @@ else
     end
 end
 ```
+```lua
+-- Check workspace for the actual spawned dealer NPC
+for _, v in pairs(workspace:GetDescendants()) do
+    if v.Name:lower():find("legendary") or v.Name:lower():find("sword dealer") then
+        print(v:GetFullName(), v.ClassName)
+        -- Check its attributes
+        for k, val in pairs(v:GetAttributes()) do
+            print("  Attr:", k, "=", val)
+        end
+        -- Check children for NumberValues
+        for _, child in pairs(v:GetChildren()) do
+            if child.ClassName:find("Value") then
+                print("  Value:", child.Name, "=", child.Value)
+            end
+        end
+    end
+end
+```
 
 
