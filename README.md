@@ -461,5 +461,24 @@ for _, v in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
     end
 end
 ```
+```lua
+local dealer = game:GetService("ReplicatedStorage").NPCs:FindFirstChild("Legendary Sword Dealer")
+if dealer then
+    for _, v in pairs(dealer:GetDescendants()) do
+        print(v:GetFullName(), v.ClassName, pcall(function() return v.Value end))
+    end
+    -- Also check attributes
+    for k, v in pairs(dealer:GetAttributes()) do
+        print("Attr:", k, v)
+    end
+else
+    print("not found in RS, checking workspace")
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name:lower():find("legendary") then
+            print(v:GetFullName(), v.ClassName)
+        end
+    end
+end
+```
 
 
